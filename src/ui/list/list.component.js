@@ -1,7 +1,5 @@
 import { h, Component, render } from "preact";
-import { importMapType } from "../../api/js-api";
 import ModuleDialog from "./module-dialog.component";
-import ExternalImportMap from "./external-importmap-dialog.component";
 import { devLibs } from "../dev-lib-overrides.component";
 
 export default class List extends Component {
@@ -14,15 +12,11 @@ export default class List extends Component {
     searchVal: "",
   };
   componentDidMount() {
-    window.importMapOverrides.getDefaultMap().then((notOverriddenMap) => {
-      this.setState({ notOverriddenMap });
-    });
-    window.importMapOverrides.getCurrentPageMap().then((currentPageMap) => {
-      this.setState({ currentPageMap });
-    });
-    window.importMapOverrides.getNextPageMap().then((nextPageMap) => {
-      this.setState({ nextPageMap });
-    });
+    this.setState({ 
+      notOverriddenMap: window.importMapOverrides.getDefaultMap(),
+      currentPageMap: window.importMapOverrides.getCurrentPageMap(),
+      nextPageMap: window.importMapOverrides.getNextPageMap()
+    })
     window.addEventListener("import-map-overrides:change", this.doUpdate);
     this.inputRef.focus();
   }
@@ -43,22 +37,6 @@ export default class List extends Component {
         this.dialogContainer
       );
     } else if (prevState.dialogModule && !this.state.dialogModule) {
-      render(null, this.dialogContainer);
-      this.dialogContainer.remove();
-      delete this.dialogContainer;
-    }
-
-    if (!prevState.dialogExternalMap && this.state.dialogExternalMap) {
-      this.dialogContainer = document.createElement("div");
-      document.body.appendChild(this.dialogContainer);
-      render(
-        <ExternalImportMap
-          dialogExternalMap={this.state.dialogExternalMap}
-          cancel={this.cancel}
-        />,
-        this.dialogContainer
-      );
-    } else if (prevState.dialogExternalMap && !this.state.dialogExternalMap) {
       render(null, this.dialogContainer);
       this.dialogContainer.remove();
       delete this.dialogContainer;
@@ -149,12 +127,6 @@ export default class List extends Component {
     defaultModules.sort(sorter);
     nextOverriddenModules.sort(sorter);
 
-    const {
-      brokenMaps,
-      workingCurrentPageMaps,
-      workingNextPageMaps,
-    } = getExternalMaps();
-
     return (
       <div className="imo-list-container">
         <div className="imo-table-header-actions">
@@ -167,28 +139,6 @@ export default class List extends Component {
             ref={(ref) => (this.inputRef = ref)}
           />
           <div className="imo-add-new">
-            <button
-              onClick={() =>
-                this.setState({
-                  dialogModule: { moduleName: "New module", isNew: true },
-                })
-              }
-            >
-              Add new module
-            </button>
-          </div>
-          <div className="imo-add-new">
-            <button
-              onClick={() => {
-                this.setState({
-                  dialogExternalMap: { url: "", isNew: true },
-                });
-              }}
-            >
-              Add import map
-            </button>
-          </div>
-          <div className="imo-add-new">
             <button onClick={() => window.importMapOverrides.resetOverrides()}>
               Reset all overrides
             </button>
@@ -199,8 +149,7 @@ export default class List extends Component {
             <tr>
               <th>Module Status</th>
               <th>Module Name</th>
-              <th>Domain</th>
-              <th>Filename</th>
+              <th>Entry</th>
             </tr>
           </thead>
           <tbody>
@@ -217,8 +166,7 @@ export default class List extends Component {
                   <div className="imo-needs-refresh" />
                 </td>
                 <td>{mod.moduleName}</td>
-                <td>{toDomain(mod)}</td>
-                <td>{toFileName(mod)}</td>
+                <td>{toUrlStr(mod)}</td>
               </tr>
             ))}
             {pendingRefreshDefaultModules.map((mod) => (
@@ -234,8 +182,7 @@ export default class List extends Component {
                   <div className="imo-needs-refresh" />
                 </td>
                 <td>{mod.moduleName}</td>
-                <td>{toDomain(mod)}</td>
-                <td>{toFileName(mod)}</td>
+                <td>{toUrlStr(mod)}</td>
               </tr>
             ))}
             {disabledOverrides.map((mod) => (
@@ -250,8 +197,7 @@ export default class List extends Component {
                   <div>Override disabled</div>
                 </td>
                 <td>{mod.moduleName}</td>
-                <td>{toDomain(mod)}</td>
-                <td>{toFileName(mod)}</td>
+                <td>{toUrlStr(mod)}</td>
               </tr>
             ))}
             {overriddenModules.map((mod) => (
@@ -266,8 +212,7 @@ export default class List extends Component {
                   <div>Inline Override</div>
                 </td>
                 <td>{mod.moduleName}</td>
-                <td>{toDomain(mod)}</td>
-                <td>{toFileName(mod)}</td>
+                <td>{toUrlStr(mod)}</td>
               </tr>
             ))}
             {externalOverrideModules.map((mod) => (
@@ -282,8 +227,7 @@ export default class List extends Component {
                   <div>External Override</div>
                 </td>
                 <td>{mod.moduleName}</td>
-                <td>{toDomain(mod)}</td>
-                <td>{toFileName(mod)}</td>
+                <td>{toUrlStr(mod)}</td>
               </tr>
             ))}
             {devLibModules.map((mod) => (
@@ -299,8 +243,7 @@ export default class List extends Component {
                   <div>Dev Lib Override</div>
                 </td>
                 <td>{mod.moduleName}</td>
-                <td>{toDomain(mod)}</td>
-                <td>{toFileName(mod)}</td>
+                <td>{toUrlStr(mod)}</td>
               </tr>
             ))}
             {defaultModules.map((mod) => (
@@ -315,72 +258,11 @@ export default class List extends Component {
                   <div>Default</div>
                 </td>
                 <td>{mod.moduleName}</td>
-                <td>{toDomain(mod)}</td>
-                <td>{toFileName(mod)}</td>
+                <td>{toUrlStr(mod)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {(brokenMaps.length > 0 ||
-          workingCurrentPageMaps.length > 0 ||
-          workingNextPageMaps.length > 0) && (
-          <table className="imo-overrides-table">
-            <thead>
-              <th>Import Map Status</th>
-              <th>URL</th>
-            </thead>
-            <tbody>
-              {brokenMaps.map((url) => (
-                <tr
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    this.setState({ dialogExternalMap: { isNew: false, url } })
-                  }
-                  key={url}
-                >
-                  <td>
-                    <div className="imo-status imo-disabled-override" />
-                    <div>Invalid</div>
-                  </td>
-                  <td>{url}</td>
-                </tr>
-              ))}
-              {workingNextPageMaps.map((url) => (
-                <tr
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    this.setState({ dialogExternalMap: { isNew: false, url } })
-                  }
-                  key={url}
-                >
-                  <td>
-                    <div className="imo-status imo-next-override" />
-                    <div>Pending refresh</div>
-                  </td>
-                  <td>{url}</td>
-                </tr>
-              ))}
-              {workingCurrentPageMaps.map((url) => (
-                <tr
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    this.setState({ dialogExternalMap: { isNew: false, url } })
-                  }
-                  key={url}
-                >
-                  <td>
-                    <div className="imo-status imo-current-override" />
-                    <div>Override</div>
-                  </td>
-                  <td>{url}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
     );
   }
@@ -408,9 +290,7 @@ export default class List extends Component {
 
   doUpdate = () => {
     this.forceUpdate();
-    window.importMapOverrides.getNextPageMap().then((nextPageMap) => {
-      this.setState({ nextPageMap });
-    });
+    this.setState({ nextPageMap: window.importMapOverrides.getNextPageMap() })
   };
 
   addNewModule = (name, url) => {
@@ -435,18 +315,6 @@ const currentBase =
   (document.querySelector("base") && document.querySelector("base").href) ||
   location.origin + "/";
 
-function toDomain(mod) {
-  const urlStr = toUrlStr(mod);
-  const url = toURL(urlStr);
-  return url ? url.host : urlStr;
-}
-
-function toFileName(mod) {
-  const urlStr = toUrlStr(mod);
-  const url = toURL(urlStr);
-  return url ? url.pathname.slice(url.pathname.lastIndexOf("/") + 1) : urlStr;
-}
-
 function toUrlStr(mod) {
   return mod.overrideUrl || mod.defaultUrl;
 }
@@ -457,30 +325,4 @@ function toURL(urlStr) {
   } catch {
     return null;
   }
-}
-
-function getExternalMaps() {
-  const allExternalMaps = window.importMapOverrides.getExternalOverrides();
-  const allCurrentPageMaps = window.importMapOverrides.getCurrentPageExternalOverrides();
-  const brokenMaps = [],
-    workingCurrentPageMaps = [],
-    workingNextPageMaps = [];
-
-  for (let externalMap of allExternalMaps) {
-    if (window.importMapOverrides.invalidExternalMaps.includes(externalMap)) {
-      brokenMaps.push(externalMap);
-    } else {
-      if (allCurrentPageMaps.includes(externalMap)) {
-        workingCurrentPageMaps.push(externalMap);
-      } else {
-        workingNextPageMaps.push(externalMap);
-      }
-    }
-  }
-
-  return {
-    brokenMaps,
-    workingCurrentPageMaps,
-    workingNextPageMaps,
-  };
 }

@@ -5,24 +5,19 @@ const overrideAttribute = "data-is-importmap-override";
 
 const portRegex = /^\d+$/g;
 
-const importMapMetaElement = document.querySelector(
-  'meta[name="importmap-type"]'
-);
+// export const importMapType = importMapMetaElement
+//   ? importMapMetaElement.getAttribute("content")
+//   : "importmap";
 
-const externalOverrideMapPromises = {};
+// const serverOverrides = importMapMetaElement
+//   ? importMapMetaElement.hasAttribute("server-cookie")
+//   : false;
+// const serverOnly = importMapMetaElement
+//   ? importMapMetaElement.hasAttribute("server-only")
+//   : false;
 
-export const importMapType = importMapMetaElement
-  ? importMapMetaElement.getAttribute("content")
-  : "importmap";
-
-const serverOverrides = importMapMetaElement
-  ? importMapMetaElement.hasAttribute("server-cookie")
-  : false;
-const serverOnly = importMapMetaElement
-  ? importMapMetaElement.hasAttribute("server-only")
-  : false;
-
-let defaultMapPromise;
+let originalMap = null
+let defaultMap = createEmptyImportMap()
 
 window.importMapOverrides = {
   addOverride(moduleName, url) {
@@ -31,9 +26,9 @@ window.importMapOverrides = {
     }
     const key = localStoragePrefix + moduleName;
     localStorage.setItem(key, url);
-    if (serverOverrides) {
-      document.cookie = `${key}=${url}`;
-    }
+    // if (serverOverrides) {
+    //   document.cookie = `${key}=${url}`;
+    // }
     fireChangedEvent();
     return imo.getOverrideMap();
   },
@@ -55,9 +50,9 @@ window.importMapOverrides = {
     const key = localStoragePrefix + moduleName;
     const hasItem = localStorage.getItem(key) !== null;
     localStorage.removeItem(key);
-    if (serverOverrides) {
-      document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
-    }
+    // if (serverOverrides) {
+    //   document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+    // }
     imo.enableOverride(moduleName);
     fireChangedEvent();
     return hasItem;
@@ -111,46 +106,30 @@ window.importMapOverrides = {
     }
     return outMap;
   },
+  setDefaultMap(map){
+    originalMap = map
+    
+    defaultMap = imo.mergeImportMap({
+      imports: Object.keys(map).reduce((map, key) => {
+        map[key] = originalMap[key].entry
+        return map
+      }, {})
+    }, {})
+  },
+  getCurrentQiankunMap() {
+    const currentPageMap = imo.getCurrentPageMap()
+    return Object.keys(originalMap).reduce((map, key) => {
+      map[key] = { ...originalMap[key], entry: currentPageMap.imports[key] }
+      return map
+    }, {})
+  },
   getDefaultMap() {
-    return (
-      defaultMapPromise ||
-      (defaultMapPromise = Array.prototype.reduce.call(
-        document.querySelectorAll(
-          `script[type="${importMapType}"], script[type="overridable-importmap"]`
-        ),
-        (promise, scriptEl) => {
-          if (scriptEl.hasAttribute(overrideAttribute)) {
-            return promise;
-          } else {
-            let nextPromise;
-            if (scriptEl.src) {
-              nextPromise = fetchExternalMap(scriptEl.src);
-            } else {
-              nextPromise = Promise.resolve(JSON.parse(scriptEl.textContent));
-            }
-
-            return Promise.all([
-              promise,
-              nextPromise,
-            ]).then(([originalMap, newMap]) =>
-              imo.mergeImportMap(originalMap, newMap)
-            );
-          }
-        },
-        Promise.resolve(createEmptyImportMap())
-      ))
-    );
+    return defaultMap
   },
   getCurrentPageMap() {
-    return Promise.all([
-      imo.getDefaultMap(),
-      imo.getExternalOverrideMap(imo.getCurrentPageExternalOverrides()),
-    ]).then(([defaultMap, externalOverridesMap]) => {
-      return imo.mergeImportMap(
-        imo.mergeImportMap(defaultMap, externalOverridesMap),
-        initialOverrideMap
-      );
-    });
+    return imo.mergeImportMap(
+      defaultMap, initialOverrideMap
+    )
   },
   getCurrentPageExternalOverrides() {
     const currentPageExternalOverrides = [];
@@ -164,15 +143,10 @@ window.importMapOverrides = {
     return currentPageExternalOverrides;
   },
   getNextPageMap() {
-    return Promise.all([
+    return imo.mergeImportMap(
       imo.getDefaultMap(),
-      imo.getExternalOverrideMap(),
-    ]).then(([defaultMap, externalOverridesMap]) => {
-      return imo.mergeImportMap(
-        imo.mergeImportMap(defaultMap, externalOverridesMap),
-        imo.getOverrideMap()
-      );
-    });
+      imo.getOverrideMap(),
+    )
   },
   disableOverride(moduleName) {
     const disabledOverrides = imo.getDisabledOverrides();
@@ -211,62 +185,6 @@ window.importMapOverrides = {
   isDisabled(moduleName) {
     return imo.getDisabledOverrides().includes(moduleName);
   },
-  getExternalOverrides() {
-    let localStorageValue = localStorage.getItem(
-      externalOverridesLocalStorageKey
-    );
-    return localStorageValue ? JSON.parse(localStorageValue).sort() : [];
-  },
-  addExternalOverride(url) {
-    url = new URL(url, document.baseURI).href;
-    const overrides = imo.getExternalOverrides();
-    if (overrides.includes(url)) {
-      return false;
-    } else {
-      localStorage.setItem(
-        externalOverridesLocalStorageKey,
-        JSON.stringify(overrides.concat(url))
-      );
-      fireChangedEvent();
-      return true;
-    }
-  },
-  removeExternalOverride(url) {
-    const overrides = imo.getExternalOverrides();
-    if (overrides.includes(url)) {
-      localStorage.setItem(
-        externalOverridesLocalStorageKey,
-        JSON.stringify(overrides.filter((override) => override !== url))
-      );
-      fireChangedEvent();
-      return true;
-    } else {
-      return false;
-    }
-  },
-  getExternalOverrideMap(externalOverrides = imo.getExternalOverrides()) {
-    return externalOverrides.reduce((result, externalOverride) => {
-      const fetchPromise =
-        externalOverrideMapPromises[externalOverride] ||
-        (externalOverrideMapPromises[externalOverride] = fetchExternalMap(
-          externalOverride
-        ));
-      return Promise.all([result, fetchPromise]).then(
-        ([firstMap, secondMap]) => {
-          return imo.mergeImportMap(firstMap, secondMap);
-        }
-      );
-    }, Promise.resolve(createEmptyImportMap()));
-  },
-  isExternalMapValid(importMapUrl) {
-    const promise =
-      externalOverrideMapPromises[importMapUrl] ||
-      (externalOverrideMapPromises[importMapUrl] = fetchExternalMap(
-        importMapUrl
-      ));
-    return promise.then(() => invalidExternalMaps.includes(importMapUrl));
-  },
-  invalidExternalMaps: [],
 };
 
 const imo = window.importMapOverrides;
@@ -281,121 +199,9 @@ function fireChangedEvent() {
 }
 
 const initialOverrideMap = imo.getOverrideMap();
-const initialExternalOverrideMaps = imo.getExternalOverrides();
-
-let referenceNode;
-
-if (!serverOnly) {
-  const overridableImportMap = document.querySelector(
-    'script[type="overridable-importmap"]'
-  );
-
-  referenceNode = overridableImportMap;
-
-  if (!referenceNode) {
-    const importMaps = document.querySelectorAll(
-      `script[type="${importMapType}"]`
-    );
-    referenceNode = importMaps ? importMaps[importMaps.length - 1] : null;
-  }
-
-  if (overridableImportMap) {
-    if (overridableImportMap.src) {
-      throw Error(
-        `import-map-overrides: external import maps with type="overridable-importmap" are not supported`
-      );
-    }
-    let originalMap;
-    try {
-      originalMap = JSON.parse(overridableImportMap.textContent);
-    } catch (e) {
-      throw Error(
-        `Invalid <script type="overridable-importmap"> - text content must be json`
-      );
-    }
-
-    referenceNode = insertOverrideMap(
-      imo.mergeImportMap(originalMap, initialOverrideMap),
-      `import-map-overrides`,
-      referenceNode
-    );
-    insertAllExternalOverrideMaps();
-  } else {
-    insertAllExternalOverrideMaps();
-    if (Object.keys(initialOverrideMap.imports).length > 0) {
-      referenceNode = insertOverrideMap(
-        initialOverrideMap,
-        `import-map-overrides`,
-        referenceNode
-      );
-    }
-  }
-}
-
-function insertOverrideMap(map, id, referenceNode) {
-  const overrideMapElement = document.createElement("script");
-  overrideMapElement.type = importMapType;
-  overrideMapElement.id = id; // for debugging and for UI to identify this import map as special
-  overrideMapElement.setAttribute(overrideAttribute, "");
-  if (typeof map === "string") {
-    overrideMapElement.src = map;
-  } else {
-    overrideMapElement.textContent = JSON.stringify(map, null, 2);
-  }
-
-  if (referenceNode) {
-    referenceNode.insertAdjacentElement("afterend", overrideMapElement);
-  } else {
-    document.head.appendChild(overrideMapElement);
-  }
-
-  return overrideMapElement;
-}
-
-function fetchExternalMap(url) {
-  return fetch(url).then(
-    (r) => {
-      if (r.ok) {
-        return r.json().catch((err) => {
-          console.warn(
-            Error(
-              `External override import map contained invalid json, at url ${r.url}. ${err}`
-            )
-          );
-          imo.invalidExternalMaps.push(r.url);
-          return createEmptyImportMap();
-        });
-      } else {
-        console.warn(
-          Error(
-            `Unable to download external override import map from url ${r.url}. Server responded with status ${r.status}`
-          )
-        );
-        imo.invalidExternalMaps.push(r.url);
-        return createEmptyImportMap();
-      }
-    },
-    () => {
-      console.warn(
-        Error(`Unable to download external import map at url '${url}'`)
-      );
-      imo.invalidExternalMaps.push(new URL(url, document.baseURI).href);
-      return createEmptyImportMap();
-    }
-  );
-}
 
 function createEmptyImportMap() {
   return { imports: {}, scopes: {} };
 }
 
-function insertAllExternalOverrideMaps() {
-  if (initialExternalOverrideMaps.length > 0) {
-    initialExternalOverrideMaps.forEach((mapUrl, index) => {
-      referenceNode = insertOverrideMap(
-        mapUrl,
-        `import-map-overrides-external-${index}`
-      );
-    });
-  }
-}
+export default imo

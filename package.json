@@ -1,9 +1,9 @@
 {
-  "name": "import-map-overrides",
-  "version": "1.15.1",
+  "name": "qiankun-overrides",
+  "version": "1.0.0",
   "main": "dist/import-map-overrides.js",
-  "repository": "https://github.com/joeldenning/import-map-overrides.git",
-  "author": "Joel Denning <joeldenning@gmail.com>",
+  "repository": "https://github.com/ousiri/qiankun-overrides.git",
+  "author": "ousiri <ousiri@gmail.com>",
   "license": "MIT",
   "scripts": {
     "build": "yarn clean && cross-env NODE_ENV=production rollup -c",
