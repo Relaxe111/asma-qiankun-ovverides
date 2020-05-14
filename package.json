@@ -1,6 +1,6 @@
 {
   "name": "qiankun-overrides",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist/import-map-overrides.js",
   "repository": "https://github.com/ousiri/qiankun-overrides.git",
   "author": "ousiri <ousiri@gmail.com>",
@@ -23,6 +23,9 @@
   ],
   "files": [
     "dist"
+  ],
+  "keywords": [
+    "qiankun", "single-spa", "import-map-overrides"
   ],
   "devDependencies": {
     "@babel/core": "^7.9.0",

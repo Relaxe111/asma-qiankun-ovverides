@@ -106,12 +106,16 @@ window.importMapOverrides = {
     }
     return outMap;
   },
-  setDefaultMap(map){
-    originalMap = map
+  setDefaultMap(arr){
+    originalMap = arr.reduce((map, microApp) => {
+      map[microApp.name] = microApp
+      return map
+    }, {})
     
     defaultMap = imo.mergeImportMap({
-      imports: Object.keys(map).reduce((map, key) => {
-        map[key] = originalMap[key].entry
+      imports: arr.reduce((map, item) => {
+        const name = item.name
+        map[name] = originalMap[name].entry
         return map
       }, {})
     }, {})
