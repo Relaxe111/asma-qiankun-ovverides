@@ -1,6 +1,6 @@
 # qiankun-overrides
 
-forked from [joeldenning/import-map-overrides](https://github.com/joeldenning/import-map-overrides)
+forked from [ousiri/qiankun-overrides](https://github.com/ousiri/qiankun-overrides)
 
 import-map-overrides for [Qiankun](https://qiankun.umijs.org/)
 
