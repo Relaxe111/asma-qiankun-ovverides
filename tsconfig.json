@@ -1,0 +1,39 @@
+{
+    "compilerOptions": {
+        "allowJs": false,
+        "allowSyntheticDefaultImports": true,
+
+        "strict": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "strictBindCallApply": true,
+
+        "noEmit": true,
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "noUnusedLocals": false,
+        "noImplicitReturns": true,
+        "noUnusedParameters": true,
+        "noUncheckedIndexedAccess": true,
+        "noFallthroughCasesInSwitch": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "jsx": "preserve",
+        "target": "ESNext",
+        "module": "ESNext",
+        "skipLibCheck": true,
+        "isolatedModules": true,
+        "esModuleInterop": false,
+        "resolveJsonModule": true,
+        "moduleResolution": "Node",
+        "experimentalDecorators": false,
+        "importsNotUsedAsValues": "error",
+        "forceConsistentCasingInFileNames": true,
+        "useUnknownInCatchVariables": false,
+        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "types": ["vite/client", "vite-plugin-svgr/client", "node"],
+
+        "plugins": [{ "name": "typescript-plugin-css-modules" }]
+    },
+    "include": ["./src", "configs/EnvConfigs.ts", "generated"],
+    "exclude": ["node_modules"]
+}
